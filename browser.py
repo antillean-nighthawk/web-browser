@@ -1,10 +1,11 @@
-import socket, sys, ssl
-
-# ex) url = "http://example.org/index.html"
+import socket, sys, ssl, os
+from dotenv import load_dotenv
 
 def request(url):
     # url parsing
     scheme, url = url.split("://",1)
+    if scheme == "file": 
+        file(url)
     assert scheme in ["http", "https"], \
         "Unknown scheme {}".format(scheme)
     host, path = url.split("/",1)
@@ -57,6 +58,12 @@ def request(url):
 
     return headers,body
 
+# show local files
+def file(url):
+    with open(url, "r+") as file:
+        print(file.read())
+    sys.exit()
+
 def show(body):
     # print out everything between '<' and '>'
     in_angle = False
@@ -73,5 +80,10 @@ def load(url):
     show(body)
 
 if __name__ == "__main__":
-    load("https://example.org/index.html/")
-    # load(sys.argv[1])
+    # if no url provided open default file
+    load_dotenv()
+    DEFAULT_SITE = os.getenv("DEFAULT_SITE")
+    if len(sys.argv) == 1:
+        load(DEFAULT_SITE)
+
+    load(sys.argv[1])
