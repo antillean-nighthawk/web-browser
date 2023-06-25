@@ -31,8 +31,10 @@ def request(url):
         s = ctx.wrap_socket(s, server_hostname=host)
     
     # request + response
-    s.send("GET {} HTTP/1.0\r\n".format(path).encode("utf8") +
-        "Host: {}\r\n\r\n".format(host).encode("utf8"))
+    s.send("GET {} HTTP/1.1\r\n".format(path).encode("utf8") +
+        "Host: {}\r\n\r\n".format(host).encode("utf8") +
+        "Connection: close".encode("utf8") +
+        "User-Agent: python test browser :3".encode("utf8"))
     response = s.makefile("r", encoding="utf8", newline="\r\n")
 
     statusline = response.readline()
@@ -71,5 +73,5 @@ def load(url):
     show(body)
 
 if __name__ == "__main__":
-    load("https://example.org/index.html")
+    load("https://example.org/index.html/")
     # load(sys.argv[1])
