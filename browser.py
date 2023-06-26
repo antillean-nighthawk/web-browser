@@ -78,15 +78,28 @@ def file(url):
     sys.exit()
 
 def show(body):
-    # print out everything between '<' and '>'
+    # print out body (not tags)
     in_angle = False
+    in_body = False
+    tag = ""
+
     for c in body:
         if c == "<":
+            tag += c
             in_angle = True
         elif c == ">":
+            tag += c
             in_angle = False
-        elif not in_angle:
+            if tag == "<body>":
+                in_body = True
+            elif tag == "</body>":
+                in_body = False
+            tag = ""
+        elif in_angle:
+            tag += c
+        elif in_body and not in_angle:
             print(c, end="")
+
 
 def load(url):
     headers, body = request(url)
@@ -94,9 +107,10 @@ def load(url):
 
 if __name__ == "__main__":
     # if no url provided open default file
-    load_dotenv()
-    DEFAULT_SITE = os.getenv("DEFAULT_SITE")
-    if len(sys.argv) == 1:
-        load(DEFAULT_SITE)
+    # load_dotenv()
+    # DEFAULT_SITE = os.getenv("DEFAULT_SITE")
+    # if len(sys.argv) == 1:
+    #     load(DEFAULT_SITE)
 
-    load(sys.argv[1])
+    # load(sys.argv[1])
+    load("https://example.com/")
