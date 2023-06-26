@@ -1,13 +1,26 @@
-import socket, sys, ssl, os
+import socket, sys, ssl, os, pprint
 from dotenv import load_dotenv
 
+def parse(url):
+    if url.startswith("data:text/html"):
+        return "data:text/html", url[15:]
+    elif url.startswith("https"):
+        return url.split("://",1)   
+    elif url.startswith("http"):
+        return url.split("://",1)
+    elif url.startswith("file"):
+        return url.split("://",1)
+    else:
+        print("Unknown scheme {}".format(url.split("://",1)))
+        sys.exit("Exiting...")
+        
 def request(url):
-    # url parsing
-    scheme, url = url.split("://",1)
+    # url scheme parsing
+    scheme, url = parse(url)
     if scheme == "file": 
         file(url)
-    assert scheme in ["http", "https"], \
-        "Unknown scheme {}".format(scheme)
+    elif scheme == "data:text/html":
+        return '', url
     host, path = url.split("/",1)
     path = "/" + path
 
