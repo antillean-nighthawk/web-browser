@@ -1,28 +1,28 @@
-import socket, sys, ssl, os, pprint
+import socket, sys, ssl, os
 from dotenv import load_dotenv
 
 def parse(url):
     if url.startswith("data:text/html"):
         return "data:text/html", url[15:]
-    elif url.startswith("https"):
-        return url.split("://",1)   
-    elif url.startswith("http"):
-        return url.split("://",1)
-    elif url.startswith("file"):
-        return url.split("://",1)
-    else:
-        print("Unknown scheme {}".format(url.split("://",1)))
-        sys.exit("Exiting...")
+    
+    for schema in ["https", "http", "file"]:
+        if url.startswith(schema):
+            return url.split("://",1)   
+        
+    print("Unknown scheme {}".format(url.split("://",1)))
+    sys.exit("Exiting...")
         
 def request(url):
     # url scheme parsing
     scheme, url = parse(url)
     if scheme == "file": 
-        file(url)
+        with open(url[1:], "r+") as file:
+            return '', file.read()
     elif scheme == "data:text/html":
         return '', url
-    host, path = url.split("/",1)
-    path = "/" + path
+    else: # http/https
+        host, path = url.split("/",1)
+        path = "/" + path
 
     # define default or custom port
     port = 80 if scheme == "http" else 443
@@ -71,46 +71,63 @@ def request(url):
 
     return headers,body
 
-# show local files
-def file(url):
-    with open(url, "r+") as file:
-        print(file.read())
-    sys.exit()
-
 def show(body):
     # print out body (not tags)
     in_angle = False
     in_body = False
+    in_entity = False
+    view_source = True
     tag = ""
+    entity = ""
 
     for c in body:
-        if c == "<":
-            tag += c
+        if c == "<": # enter tag
             in_angle = True
-        elif c == ">":
-            tag += c
-            in_angle = False
-            if tag == "<body>":
-                in_body = True
-            elif tag == "</body>":
-                in_body = False
             tag = ""
+        elif c == ">": # exit tag
+            in_angle = False
+            if tag == "body":
+                in_body = True
+            elif tag == "/body":
+                in_body == False
         elif in_angle:
+            view_source = False
             tag += c
-        elif in_body and not in_angle:
-            print(c, end="")
+        elif not in_angle:
+            if c == "&": # enter entity
+                in_entity = True
+                entity += c
+            elif in_entity: 
+                entity += c
+                if len(entity) == 4: # exit entity
+                    if entity == "&lt;":
+                        print("<", end="")
+                    elif entity == "&gt;":
+                        print(">", end="")
+                    entity = ""
+                    in_entity = False
+            elif in_body or view_source:
+                print(c, end="")
 
+def transform(body):
+    # view source
+    lt = body.replace("<","&lt;")
+    gt = lt.replace(">","&gt;")
+    return gt
 
 def load(url):
     headers, body = request(url)
     show(body)
+    # show(transform(body))
 
 if __name__ == "__main__":
     # if no url provided open default file
-    # load_dotenv()
-    # DEFAULT_SITE = os.getenv("DEFAULT_SITE")
-    # if len(sys.argv) == 1:
-    #     load(DEFAULT_SITE)
-
-    # load(sys.argv[1])
-    load("https://example.com/")
+    
+    load_dotenv()
+    DEFAULT_SITE = os.getenv("DEFAULT_SITE")
+    if len(sys.argv) == 1:
+        load(DEFAULT_SITE)
+    else:
+        load(sys.argv[1])
+    # load("https://example.com/")
+    # load("https://browser.engineering/index.html")
