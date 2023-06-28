@@ -1,4 +1,5 @@
 default_site.html 
 .env
 test_ch1.py 
+test_ch2.py
 __pycache__

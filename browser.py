@@ -1,17 +1,52 @@
 import socket, sys, ssl, os
+import tkinter
 from dotenv import load_dotenv
 
-def parse(url):
-    if url.startswith("data:text/html"):
-        return "data:text/html", url[15:]
-    
-    for schema in ["https", "http", "file", "view-source:http", "view-source:https"]:
-        if url.startswith(schema):
-            return url.split("://",1)   
-        
-    print("Unknown scheme {}".format(url.split("://",1)))
-    sys.exit("Exiting...")
-        
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 20
+
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def load(self, url):
+        scheme, headers, body = request(url)
+        if scheme == "view-source:http":
+            text = lex(transform(body))
+        else:
+            text = lex(body)
+        self.display_list = layout(text)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, c in self.display_list:
+            if y > self.scroll + HEIGHT: continue
+            if y + VSTEP < self.scroll: continue
+            self.canvas.create_text(x, y - self.scroll, text=c)
+
+    def scrolldown(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
+
+def layout(text):
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+    for c in text:
+        display_list.append((cursor_x, cursor_y, c))
+        cursor_x += HSTEP
+        if cursor_x >= WIDTH - HSTEP:
+            cursor_y += VSTEP
+            cursor_x = HSTEP
+
+    return display_list
+
+# textbook functions        
 def request(url):
     # url scheme parsing
     scheme, url = parse(url)
@@ -21,7 +56,7 @@ def request(url):
             return scheme, '', file.read()
     elif scheme == "data:text/html":
         return scheme, '', url
-
+    
     host, path = url.split("/",1)
     path = "/" + path
 
@@ -64,11 +99,11 @@ def request(url):
         headers[header.lower()] = value.strip()
 
     # redirect checking
-    if status[0] == '3': # 300 range status
+    if status[0] == '3': # 300 range status code
         try:
             for i in range(3):
                 if headers["location"][0] == '/':
-                    scheme, headers, body = request(host, headers["location"])
+                    scheme, headers, body = request("{}{}".format(host, headers["location"]))
                 else:
                     scheme, headers, body = request(headers["location"])
                 return scheme, headers, body
@@ -84,7 +119,7 @@ def request(url):
 
     return scheme, headers, body
 
-def show(body):
+def lex(body):
     # print out body (not tags)
     in_angle = False
     in_body = False
@@ -92,6 +127,7 @@ def show(body):
     view_source = True
     tag = ""
     entity = ""
+    text = ""
 
     for c in body:
         if c == "<": # enter tag
@@ -99,9 +135,9 @@ def show(body):
             tag = ""
         elif c == ">": # exit tag
             in_angle = False
-            if tag == "body":
+            if "body" in tag:
                 in_body = True
-            elif tag == "/body":
+            elif "/body" in tag:
                 in_body == False
         elif in_angle:
             view_source = False
@@ -114,13 +150,27 @@ def show(body):
                 entity += c
                 if len(entity) == 4: # exit entity
                     if entity == "&lt;":
-                        print("<", end="")
+                        text += '<'
                     elif entity == "&gt;":
-                        print(">", end="")
+                        text += '>'
                     entity = ""
                     in_entity = False
             elif in_body or view_source:
-                print(c, end="")
+                text += c
+
+    return text
+
+# my own helper functions
+def parse(url):
+    if url.startswith("data:text/html"):
+        return "data:text/html", url[15:]
+    
+    for schema in ["https", "http", "file", "view-source:http", "view-source:https"]:
+        if url.startswith(schema):
+            return url.split("://",1)   
+        
+    print("Unknown scheme {}".format(url.split("://",1)))
+    sys.exit("Exiting...")
 
 def transform(body):
     # view source
@@ -128,21 +178,15 @@ def transform(body):
     gt = lt.replace(">","&gt;")
     return gt
 
-def load(url):
-    scheme, headers, body = request(url)
-    if scheme == "view-source:http":
-        show(transform(body))
-    else:
-        show(body)
-
 if __name__ == "__main__":
-    # if no url provided open default file
+    # journey to the west !
+    Browser().load("https://browser.engineering/examples/xiyouji.html")
+    tkinter.mainloop()
 
+    # if no url provided open default file
     # load_dotenv()
     # DEFAULT_SITE = os.getenv("DEFAULT_SITE")
     # if len(sys.argv) == 1:
     #     load(DEFAULT_SITE)
     # else:
     #     load(sys.argv[1])
-    # load("https://example.com/")
-    load("https://browser.engineering/redirect")
