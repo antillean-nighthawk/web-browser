@@ -1,2 +1,4 @@
-default_site.html
+default_site.html 
 .env
+test_ch1.py 
+__pycache__

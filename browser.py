@@ -5,7 +5,7 @@ def parse(url):
     if url.startswith("data:text/html"):
         return "data:text/html", url[15:]
     
-    for schema in ["https", "http", "file"]:
+    for schema in ["https", "http", "file", "view-source:http", "view-source:https"]:
         if url.startswith(schema):
             return url.split("://",1)   
         
@@ -15,17 +15,18 @@ def parse(url):
 def request(url):
     # url scheme parsing
     scheme, url = parse(url)
+
     if scheme == "file": 
         with open(url[1:], "r+") as file:
-            return '', file.read()
+            return scheme, '', file.read()
     elif scheme == "data:text/html":
-        return '', url
-    else: # http/https
-        host, path = url.split("/",1)
-        path = "/" + path
+        return scheme, '', url
+
+    host, path = url.split("/",1)
+    path = "/" + path
 
     # define default or custom port
-    port = 80 if scheme == "http" else 443
+    port = 443 if "https" in scheme else 80
     if ":" in host:
         host, port = host.split(":",1)
         port = int(port)
@@ -53,7 +54,7 @@ def request(url):
 
     statusline = response.readline()
     version, status, explanation = statusline.split(" ",2)
-    assert status == "200", "{}: {}".format(status, explanation)
+    # assert status == "200", "{}: {}".format(status, explanation)
 
     headers = {}
     while True:
@@ -62,6 +63,18 @@ def request(url):
         header, value = line.split(":", 1)
         headers[header.lower()] = value.strip()
 
+    # redirect checking
+    if status[0] == '3': # 300 range status
+        try:
+            for i in range(3):
+                if headers["location"][0] == '/':
+                    scheme, headers, body = request(host, headers["location"])
+                else:
+                    scheme, headers, body = request(headers["location"])
+                return scheme, headers, body
+        except:
+            sys.exit("Too many redirects, aborted")
+
     # check for weird stuff
     assert "transfer-encoding" not in headers
     assert "content-encoding" not in headers
@@ -69,7 +82,7 @@ def request(url):
     body = response.read()
     s.close()
 
-    return headers,body
+    return scheme, headers, body
 
 def show(body):
     # print out body (not tags)
@@ -116,18 +129,20 @@ def transform(body):
     return gt
 
 def load(url):
-    headers, body = request(url)
-    show(body)
-    # show(transform(body))
+    scheme, headers, body = request(url)
+    if scheme == "view-source:http":
+        show(transform(body))
+    else:
+        show(body)
 
 if __name__ == "__main__":
     # if no url provided open default file
-    
-    load_dotenv()
-    DEFAULT_SITE = os.getenv("DEFAULT_SITE")
-    if len(sys.argv) == 1:
-        load(DEFAULT_SITE)
-    else:
-        load(sys.argv[1])
+
+    # load_dotenv()
+    # DEFAULT_SITE = os.getenv("DEFAULT_SITE")
+    # if len(sys.argv) == 1:
+    #     load(DEFAULT_SITE)
+    # else:
+    #     load(sys.argv[1])
     # load("https://example.com/")
-    # load("https://browser.engineering/index.html")
+    load("https://browser.engineering/redirect")
