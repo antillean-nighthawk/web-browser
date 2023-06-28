@@ -10,10 +10,11 @@
 - [x] body tag
 - [x] entities 
 - [x] view-source
-- [ ] compression
+- [ ] compression [^1]
 - [x] redirects
-- [ ] caching
-*skipped compression and caching b/c they were difficult to test*
+- [ ] caching [^1]
+
+[^1]: skipped compression and caching b/c they were difficult to test
 
 ### chapter 2:
 - [x] base code
