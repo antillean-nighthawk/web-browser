@@ -18,8 +18,8 @@
 
 ### chapter 2:
 - [x] base code
-- [ ] line breaks
-- [ ] mouse wheel
+- [x] line breaks
+- [x] mouse wheel
 - [ ] emoji
 - [ ] resizing
 - [ ] zoom

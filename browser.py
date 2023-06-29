@@ -12,7 +12,9 @@ class Browser:
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
         self.canvas.pack()
         self.scroll = 0
+        self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Down>", self.scrolldown)
+        self.window.bind("<MouseWheel>", self.mousewheel)
 
     def load(self, url):
         scheme, headers, body = request(url)
@@ -34,11 +36,30 @@ class Browser:
         self.scroll += SCROLL_STEP
         self.draw()
 
+    def scrollup(self, e):
+        if self.scroll - SCROLL_STEP > 0:
+            self.scroll -= SCROLL_STEP
+        else:
+            self.scroll = 0
+        self.draw()
+
+    def mousewheel(self, e):
+        if self.scroll + -1*(e.delta/120)*SCROLL_STEP > 0:
+            self.scroll += -1*(e.delta/120)*SCROLL_STEP
+        else: 
+            self.scroll = 0
+        self.draw()
+
 def layout(text):
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
     for c in text:
         display_list.append((cursor_x, cursor_y, c))
+
+        if c == '\n':
+            cursor_y += (VSTEP + 5)
+            cursor_x = 0
+
         cursor_x += HSTEP
         if cursor_x >= WIDTH - HSTEP:
             cursor_y += VSTEP
