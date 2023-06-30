@@ -10,8 +10,9 @@ SCROLL_STEP = 20
 class Browser:
     def __init__(self):
         self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
-        self.canvas.pack()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+        self.canvas.bind('<Configure>', self.resize)
         self.scroll = 0
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Down>", self.scrolldown)
@@ -20,10 +21,10 @@ class Browser:
     def load(self, url):
         scheme, headers, body = request(url)
         if scheme == "view-source:http":
-            text = lex(transform(body))
+            self.text = lex(transform(body))
         else:
-            text = lex(body)
-        self.display_list = layout(text)
+            self.text = lex(body)
+        self.display_list = layout(self.text)
         self.draw()
 
     def draw(self):
@@ -32,9 +33,9 @@ class Browser:
             if y > self.scroll + HEIGHT: continue
             if y + VSTEP < self.scroll: continue
             if c in UNICODE_EMOJI['en']:
-                img_path = "{}{}.gif".format(os.getenv("EMOJI_PATH"), c)
+                img_path = "{}{}.gif".format(os.getenv("EMOJI_PATH"), '{:X}'.format(ord(c)))
                 self.img = tkinter.PhotoImage(file=img_path)
-                self.canvas.create_image(x, y - self.scroll, image=self.img, anchor=tkinter.NW)
+                self.canvas.create_image(x, y - self.scroll, image=self.img)
             else:
                 self.canvas.create_text(x, y - self.scroll, text=c)
 
@@ -56,6 +57,13 @@ class Browser:
             self.scroll = 0
         self.draw()
 
+    def resize(self, e):
+        global WIDTH, HEIGHT
+        WIDTH, HEIGHT = e.width, e.height
+        self.canvas.config(width=WIDTH, height=HEIGHT)
+        self.display_list = layout(self.text)
+        self.draw()
+        
 def layout(text):
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
@@ -79,7 +87,7 @@ def request(url):
     scheme, url = parse(url)
 
     if scheme == "file": 
-        with open(url[1:], "r+") as file:
+        with open(url[1:], 'r+', encoding="utf8") as file:
             return scheme, '', file.read()
     elif scheme == "data:text/html":
         return scheme, '', url
@@ -206,10 +214,11 @@ def transform(body):
     return gt
 
 if __name__ == "__main__":
-    # journey to the west !
-    # Browser().load("https://browser.engineering/examples/xiyouji.html")
     load_dotenv()
-    Browser().load(os.getenv("DEFAULT_SITE"))
+    
+    # journey to the west !
+    Browser().load("https://browser.engineering/examples/xiyouji.html")
+    #Browser().load(os.getenv("DEFAULT_SITE"))
     tkinter.mainloop()
 
     # if no url provided open default file

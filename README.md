@@ -21,7 +21,7 @@
 - [x] line breaks
 - [x] mouse wheel
 - [x] emoji [^2]
-- [ ] resizing
+- [x] resizing
 - [ ] zoom
 
 [^2]: only works for some emojis, idk why
