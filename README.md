@@ -22,6 +22,6 @@
 - [x] mouse wheel
 - [x] emoji [^2]
 - [x] resizing
-- [ ] zoom
+- [x] zoom
 
 [^2]: only works for some emojis, idk why

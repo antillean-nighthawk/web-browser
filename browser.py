@@ -1,5 +1,5 @@
 import socket, sys, ssl, os
-import tkinter
+import tkinter, tkinter.font
 from dotenv import load_dotenv
 from emoji import UNICODE_EMOJI
 
@@ -13,10 +13,14 @@ class Browser:
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind('<Configure>', self.resize)
+
         self.scroll = 0
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<MouseWheel>", self.mousewheel)
+
+        self.font_size = 9
+        self.window.bind("<+>", self.zoom)
 
     def load(self, url):
         scheme, headers, body = request(url)
@@ -37,7 +41,7 @@ class Browser:
                 self.img = tkinter.PhotoImage(file=img_path)
                 self.canvas.create_image(x, y - self.scroll, image=self.img)
             else:
-                self.canvas.create_text(x, y - self.scroll, text=c)
+                self.canvas.create_text(x, y - self.scroll, text=c, font=tkinter.font.Font(size=self.font_size))
 
     def scrolldown(self, e):
         self.scroll += SCROLL_STEP
@@ -61,6 +65,13 @@ class Browser:
         global WIDTH, HEIGHT
         WIDTH, HEIGHT = e.width, e.height
         self.canvas.config(width=WIDTH, height=HEIGHT)
+        self.display_list = layout(self.text)
+        self.draw()
+
+    def zoom(self, e):
+        self.font_size *= 2
+        global VSTEP, HSTEP, SCROLL_STEP
+        VSTEP, HSTEP, SCROLL_STEP = VSTEP*2, HSTEP*2, SCROLL_STEP*2
         self.display_list = layout(self.text)
         self.draw()
         
