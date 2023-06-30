@@ -1,6 +1,7 @@
 import socket, sys, ssl, os
 import tkinter
 from dotenv import load_dotenv
+from emoji import UNICODE_EMOJI
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -30,7 +31,12 @@ class Browser:
         for x, y, c in self.display_list:
             if y > self.scroll + HEIGHT: continue
             if y + VSTEP < self.scroll: continue
-            self.canvas.create_text(x, y - self.scroll, text=c)
+            if c in UNICODE_EMOJI['en']:
+                img_path = "{}{}.gif".format(os.getenv("EMOJI_PATH"), c)
+                self.img = tkinter.PhotoImage(file=img_path)
+                self.canvas.create_image(x, y - self.scroll, image=self.img, anchor=tkinter.NW)
+            else:
+                self.canvas.create_text(x, y - self.scroll, text=c)
 
     def scrolldown(self, e):
         self.scroll += SCROLL_STEP
@@ -132,8 +138,8 @@ def request(url):
             sys.exit("Too many redirects, aborted")
 
     # check for weird stuff
-    assert "transfer-encoding" not in headers
-    assert "content-encoding" not in headers
+    # assert "transfer-encoding" not in headers
+    # assert "content-encoding" not in headers
 
     body = response.read()
     s.close()
@@ -177,7 +183,7 @@ def lex(body):
                     entity = ""
                     in_entity = False
             elif in_body or view_source:
-                text += c
+                text += str(c)
 
     return text
 
@@ -201,11 +207,12 @@ def transform(body):
 
 if __name__ == "__main__":
     # journey to the west !
-    Browser().load("https://browser.engineering/examples/xiyouji.html")
+    # Browser().load("https://browser.engineering/examples/xiyouji.html")
+    load_dotenv()
+    Browser().load(os.getenv("DEFAULT_SITE"))
     tkinter.mainloop()
 
     # if no url provided open default file
-    # load_dotenv()
     # DEFAULT_SITE = os.getenv("DEFAULT_SITE")
     # if len(sys.argv) == 1:
     #     load(DEFAULT_SITE)

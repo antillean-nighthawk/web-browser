@@ -1,5 +1,6 @@
 default_site.html 
 .env
-test_ch1.py 
-test_ch2.py
+tests.py
 __pycache__
+openmoji-72x72-color
+png_to_gif.py

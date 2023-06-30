@@ -20,6 +20,8 @@
 - [x] base code
 - [x] line breaks
 - [x] mouse wheel
-- [ ] emoji
+- [x] emoji [^2]
 - [ ] resizing
 - [ ] zoom
+
+[^2]: only works for some emojis, idk why
