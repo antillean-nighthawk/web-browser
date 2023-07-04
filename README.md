@@ -10,22 +10,17 @@
 - [x] body tag
 - [x] entities 
 - [x] view-source
-- [ ] compression [^1]
+- [ ] compression
 - [x] redirects
-- [ ] caching [^1]
-
-[^1]: skipped compression and caching b/c they were difficult to test
+- [ ] caching 
 
 ### chapter 2:
 - [x] base code
 - [x] line breaks
 - [x] mouse wheel
-- [x] emoji [^2]
+- [x] emoji [^1]
 - [x] resizing
-- [ ] zoom [^3]
-
-[^2]: only works for some emojis, idk why
-[^3]: removed implementation after chapter 3
+- [x] zoom 
 
 ### chapter 3:
 - [x] base code
@@ -36,4 +31,8 @@
 - [ ] preformatted text
 
 ### notes:
-- no more support for chinese since chapter 3
+- doesn't support chinese characters anymore
+- entities: less than, greater than, soft hypen
+- additional zoom out implementation
+
+[^1]: only works for some emojis, idk why

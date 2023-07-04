@@ -6,6 +6,7 @@ from emoji import UNICODE_EMOJI
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 20
+ZOOM_RATIO = 1
 FONTS = {}
 
 class Text:
@@ -17,7 +18,7 @@ class Tag:
         self.tag = tag
 
 class Layout:
-    def __init__(self, tokens, size=16):
+    def __init__(self, tokens):
         self.tokens = tokens
         self.display_list = []
         self.line = []
@@ -27,7 +28,7 @@ class Layout:
 
         self.weight = "normal"
         self.style = "roman"
-        self.size = size
+        self.size = 16 * ZOOM_RATIO
 
         for tok in tokens:
             self.token(tok)
@@ -98,6 +99,8 @@ class Browser:
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<MouseWheel>", self.mousewheel)
+        self.window.bind("<plus>", self.zoom)
+        self.window.bind("<minus>", self.zoom)
 
     def load(self, url):
         scheme, headers, body = request(url)
@@ -143,6 +146,15 @@ class Browser:
         global WIDTH, HEIGHT
         WIDTH, HEIGHT = e.width, e.height
         self.canvas.config(width=WIDTH, height=HEIGHT)
+        self.display_list = Layout(self.tokens).display_list
+        self.draw()
+
+    def zoom(self, e):
+        global ZOOM_RATIO, HSTEP, VSTEP, SCROLL_STEP
+        if e.keysym == "plus" and ZOOM_RATIO <= 3: ZOOM_RATIO += 1
+        elif e.keysym == "minus" and ZOOM_RATIO >= 1: ZOOM_RATIO -= 1
+        else: ZOOM_RATIO = 1
+        HSTEP, VSTEP, SCROLL_STEP = HSTEP*ZOOM_RATIO, VSTEP*ZOOM_RATIO, SCROLL_STEP*ZOOM_RATIO
         self.display_list = Layout(self.tokens).display_list
         self.draw()
 
@@ -229,6 +241,7 @@ def request(url):
 def lex(body):
     in_tag = False
     text = ""
+    entity = ""
     out = []
     in_body = False
 
@@ -242,12 +255,25 @@ def lex(body):
                 in_body = True
             elif "/body" in text:
                 in_body == False
-            
             in_tag = False
             out.append(Tag(text))
             text = ""
+        elif c == "&" or entity:
+            entity += c
+            if c == ";":
+                if entity == "&lt;":
+                    entity = "<"
+                elif entity == "&gt;":
+                    entity = ">"
+                elif entity == "&shy;":
+                    entity = "-"
+                text += entity
+                entity = ""
         else:
             text += c
+            if entity:
+                text += entity
+                entity = ""
 
     if not in_tag and text and in_body:
         out.append(Text(text))
@@ -274,6 +300,7 @@ def transform(token): # view source
 if __name__ == "__main__":
     load_dotenv()
     Browser().load("https://www.gutenberg.org/cache/epub/1567/pg1567-images.html")
+    # Browser().load("https://browser.engineering/text.html")
     # Browser().load(os.getenv("DEFAULT_SITE"))
     tkinter.mainloop()
 
