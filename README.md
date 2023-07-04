@@ -1,5 +1,5 @@
 # web-browser
-*code foundation from https://browser.engineering/*
+## *code foundation from https://browser.engineering/*
 
 ## exercise progress:
 ### chapter 1:
@@ -22,6 +22,18 @@
 - [x] mouse wheel
 - [x] emoji [^2]
 - [x] resizing
-- [x] zoom
+- [ ] zoom [^3]
 
 [^2]: only works for some emojis, idk why
+[^3]: removed implementation after chapter 3
+
+### chapter 3:
+- [x] base code
+- [ ] centered text
+- [ ] superscripts
+- [ ] soft hyphens
+- [ ] small caps
+- [ ] preformatted text
+
+### notes:
+- no more support for chinese since chapter 3

@@ -6,42 +6,120 @@ from emoji import UNICODE_EMOJI
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 20
+FONTS = {}
+
+class Text:
+    def __init__(self, text):
+        self.text = text
+
+class Tag:
+    def __init__(self, tag):
+        self.tag = tag
+
+class Layout:
+    def __init__(self, tokens, size=16):
+        self.tokens = tokens
+        self.display_list = []
+        self.line = []
+
+        self.cursor_x = HSTEP
+        self.cursor_y = VSTEP
+
+        self.weight = "normal"
+        self.style = "roman"
+        self.size = size
+
+        for tok in tokens:
+            self.token(tok)
+        self.flush()
+
+    def token(self, tok):
+        if isinstance(tok, Text):
+            self.text(tok)
+        elif tok.tag == "i":
+            self.style = "italic"
+        elif tok.tag == "/i":
+            self.style = "roman"
+        elif tok.tag == "b":
+            self.weight = "bold"
+        elif tok.tag == "/b":
+            self.weight = "normal"
+        elif tok.tag == "small":
+            self.size -= 2
+        elif tok.tag == "/small":
+            self.size += 2
+        elif tok.tag == "big":
+            self.size += 4
+        elif tok.tag == "/big":
+            self.size -= 4
+        elif tok.tag == "br":
+            self.flush()
+        elif tok.tag == "/p":
+            self.flush()
+            self.cursor_y += VSTEP
+
+    def text(self, tok):
+        font = get_font(self.size, self.weight, self.style)
+        for word in tok.text.split(): # assume space-seperated language
+            w = font.measure(word)
+            if self.cursor_x + w > WIDTH - HSTEP:
+                self.flush()
+            self.line.append((self.cursor_x, word, font))
+            self.cursor_x += w + font.measure(" ")
+
+    def flush(self):
+        if not self.line: return
+        
+        metrics = [font.metrics() for x, word, font in self.line]
+        max_ascent = max([metric["ascent"] for metric in metrics])
+        baseline = self.cursor_y + 1.25 * max_ascent
+        
+        for x, word, font in self.line:
+            y = baseline - font.metrics("ascent")
+            self.display_list.append((x, y, word, font))
+        
+        self.cursor_x = HSTEP
+        self.line = []
+
+        max_descent = max([metric["descent"] for metric in metrics])
+        self.cursor_y = baseline + 1.25 * max_descent
 
 class Browser:
     def __init__(self):
+        self.scroll = 0
+        self.display_list = []
+        self.tokens = None
+    
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
-        self.canvas.bind('<Configure>', self.resize)
 
-        self.scroll = 0
+        self.canvas.bind('<Configure>', self.resize)
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<MouseWheel>", self.mousewheel)
 
-        self.font_size = 9
-        self.window.bind("<+>", self.zoom)
-
     def load(self, url):
         scheme, headers, body = request(url)
         if scheme == "view-source:http":
-            self.text = lex(transform(body))
+            self.tokens = lex(transform(body))
         else:
-            self.text = lex(body)
-        self.display_list = layout(self.text)
+            self.tokens = lex(body)
+        self.display_list = Layout(self.tokens).display_list
         self.draw()
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c in self.display_list:
+        for x, y, word, font in self.display_list:
             if y > self.scroll + HEIGHT: continue
-            if y + VSTEP < self.scroll: continue
-            if c in UNICODE_EMOJI['en']:
-                img_path = "{}{}.gif".format(os.getenv("EMOJI_PATH"), '{:X}'.format(ord(c)))
+            if y + font.metrics("linespace") < self.scroll: continue
+
+            if word in UNICODE_EMOJI['en']:
+                img_path = "{}{}.gif".format(os.getenv("EMOJI_PATH"), '{:X}'.format(ord(word[0])))
                 self.img = tkinter.PhotoImage(file=img_path)
-                self.canvas.create_image(x, y - self.scroll, image=self.img)
+                self.canvas.create_image(x, y - self.scroll, image=self.img, anchor='nw')
             else:
-                self.canvas.create_text(x, y - self.scroll, text=c, font=tkinter.font.Font(size=self.font_size))
+                self.canvas.create_text(x, y - self.scroll, text=word, font=font, anchor='nw')
 
     def scrolldown(self, e):
         self.scroll += SCROLL_STEP
@@ -65,34 +143,17 @@ class Browser:
         global WIDTH, HEIGHT
         WIDTH, HEIGHT = e.width, e.height
         self.canvas.config(width=WIDTH, height=HEIGHT)
-        self.display_list = layout(self.text)
+        self.display_list = Layout(self.tokens).display_list
         self.draw()
 
-    def zoom(self, e):
-        self.font_size *= 2
-        global VSTEP, HSTEP, SCROLL_STEP
-        VSTEP, HSTEP, SCROLL_STEP = VSTEP*2, HSTEP*2, SCROLL_STEP*2
-        self.display_list = layout(self.text)
-        self.draw()
-        
-def layout(text):
-    display_list = []
-    cursor_x, cursor_y = HSTEP, VSTEP
-    for c in text:
-        display_list.append((cursor_x, cursor_y, c))
-
-        if c == '\n':
-            cursor_y += (VSTEP + 5)
-            cursor_x = 0
-
-        cursor_x += HSTEP
-        if cursor_x >= WIDTH - HSTEP:
-            cursor_y += VSTEP
-            cursor_x = HSTEP
-
-    return display_list
-
-# textbook functions        
+# textbook functions
+def get_font(size, weight, slant):
+    key = (size, weight, slant)
+    if key not in FONTS:
+        font = tkinter.font.Font(size=size, weight=weight, slant=slant)
+        FONTS[key] = font
+    return FONTS[key]
+  
 def request(url):
     # url scheme parsing
     scheme, url = parse(url)
@@ -166,48 +227,35 @@ def request(url):
     return scheme, headers, body
 
 def lex(body):
-    # print out body (not tags)
-    in_angle = False
-    in_body = False
-    in_entity = False
-    view_source = True
-    tag = ""
-    entity = ""
+    in_tag = False
     text = ""
+    out = []
+    in_body = False
 
     for c in body:
         if c == "<": # enter tag
-            in_angle = True
-            tag = ""
+            in_tag = True
+            if text and in_body: out.append(Text(text))
+            text = ""
         elif c == ">": # exit tag
-            in_angle = False
-            if "body" in tag:
+            if "body" in text:
                 in_body = True
-            elif "/body" in tag:
+            elif "/body" in text:
                 in_body == False
-        elif in_angle:
-            view_source = False
-            tag += c
-        elif not in_angle:
-            if c == "&": # enter entity
-                in_entity = True
-                entity += c
-            elif in_entity: 
-                entity += c
-                if len(entity) == 4: # exit entity
-                    if entity == "&lt;":
-                        text += '<'
-                    elif entity == "&gt;":
-                        text += '>'
-                    entity = ""
-                    in_entity = False
-            elif in_body or view_source:
-                text += str(c)
+            
+            in_tag = False
+            out.append(Tag(text))
+            text = ""
+        else:
+            text += c
 
-    return text
+    if not in_tag and text and in_body:
+        out.append(Text(text))
+
+    return out
 
 # my own helper functions
-def parse(url):
+def parse(url): # get schema
     if url.startswith("data:text/html"):
         return "data:text/html", url[15:]
     
@@ -218,18 +266,15 @@ def parse(url):
     print("Unknown scheme {}".format(url.split("://",1)))
     sys.exit("Exiting...")
 
-def transform(body):
-    # view source
-    lt = body.replace("<","&lt;")
-    gt = lt.replace(">","&gt;")
-    return gt
+def transform(token): # view source
+    text = token.text.replace("<","&lt;")
+    text = token.text.replace(">","&gt;")
+    return text
 
 if __name__ == "__main__":
     load_dotenv()
-    
-    # journey to the west !
-    Browser().load("https://browser.engineering/examples/xiyouji.html")
-    #Browser().load(os.getenv("DEFAULT_SITE"))
+    Browser().load("https://www.gutenberg.org/cache/epub/1567/pg1567-images.html")
+    # Browser().load(os.getenv("DEFAULT_SITE"))
     tkinter.mainloop()
 
     # if no url provided open default file
