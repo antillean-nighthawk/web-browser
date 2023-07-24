@@ -25,10 +25,10 @@
 ### chapter 3:
 - [x] base code
 - [ ] centered text
-- [ ] superscripts
-- [ ] soft hyphens
-- [ ] small caps
-- [ ] preformatted text
+- [x] ~~superscripts~~ subscripts 
+- [x] soft hyphens (added as entity)
+- [x] small caps
+- [x] preformatted text
 
 ### notes:
 - doesn't support chinese characters anymore

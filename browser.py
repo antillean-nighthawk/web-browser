@@ -22,13 +22,16 @@ class Layout:
         self.tokens = tokens
         self.display_list = []
         self.line = []
-
         self.cursor_x = HSTEP
         self.cursor_y = VSTEP
 
         self.weight = "normal"
         self.style = "roman"
         self.size = 16 * ZOOM_RATIO
+        self.abbr = False
+        self.pre = False
+        self.pre_font = tkinter.font.Font(size=self.size, weight=self.weight, 
+                                          slant=self.style, family="Courier")
 
         for tok in tokens:
             self.token(tok)
@@ -52,7 +55,23 @@ class Layout:
         elif tok.tag == "big":
             self.size += 4
         elif tok.tag == "/big":
+            self.size -= 4     
+        elif tok.tag == "abbr":
             self.size -= 4
+            self.weight = "bold"
+            self.abbr = True
+        elif tok.tag == "/abbr":
+            self.size += 4
+            self.weight = "normal"    
+            self.abbr = False   
+        elif tok.tag == "pre":
+            self.pre = True
+        elif tok.tag == "/pre":
+            self.pre = False
+        elif tok.tag == "sub":
+            self.size -= int(self.size/2)
+        elif tok.tag == "/sub":
+            self.size *= 2
         elif tok.tag == "br":
             self.flush()
         elif tok.tag == "/p":
@@ -60,13 +79,22 @@ class Layout:
             self.cursor_y += VSTEP
 
     def text(self, tok):
-        font = get_font(self.size, self.weight, self.style)
-        for word in tok.text.split(): # assume space-seperated language
-            w = font.measure(word)
-            if self.cursor_x + w > WIDTH - HSTEP:
+        if self.pre:
+            for l in tok.text.splitlines():
+                self.line.append((self.cursor_x, l, self.pre_font))
                 self.flush()
-            self.line.append((self.cursor_x, word, font))
-            self.cursor_x += w + font.measure(" ")
+
+        else:
+            font = get_font(self.size, self.weight, self.style)
+            for word in tok.text.split(): # assume space-seperated language
+                if self.abbr:
+                    word = word.upper()
+
+                w = font.measure(word)
+                if self.cursor_x + w > WIDTH - HSTEP:
+                    self.flush()
+                self.line.append((self.cursor_x, word, font))
+                self.cursor_x += w + font.measure(" ")
 
     def flush(self):
         if not self.line: return
@@ -299,9 +327,9 @@ def transform(token): # view source
 
 if __name__ == "__main__":
     load_dotenv()
-    Browser().load("https://www.gutenberg.org/cache/epub/1567/pg1567-images.html")
+    # Browser().load("https://www.gutenberg.org/cache/epub/1567/pg1567-images.html")
     # Browser().load("https://browser.engineering/text.html")
-    # Browser().load(os.getenv("DEFAULT_SITE"))
+    Browser().load(os.getenv("DEFAULT_SITE"))
     tkinter.mainloop()
 
     # if no url provided open default file
