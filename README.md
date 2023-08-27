@@ -30,6 +30,14 @@
 - [x] small caps
 - [x] preformatted text
 
+### chapter 4:
+- [x] base code
+- [ ] comments
+- [ ] paragraphs
+- [ ] scripts
+- [ ] quoted attributes
+- [ ] syntax highlighting
+
 ### notes:
 - doesn't support chinese characters anymore
 - entities: less than, greater than, soft hypen

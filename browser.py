@@ -10,16 +10,30 @@ ZOOM_RATIO = 1
 FONTS = {}
 
 class Text:
-    def __init__(self, text):
+    def __init__(self, text, parent):
         self.text = text
+        self.children = []
+        self.parent = parent
 
-class Tag:
-    def __init__(self, tag):
+    def __repr__(self):
+        return repr(self.text)
+
+class Element:
+    def __init__(self, tag, attributes, parent):
         self.tag = tag
+        self.attributes = attributes
+        self.children = []
+        self.parent = parent
+
+    def __repr__(self):
+        attrs = [" " + k + "=\"" + v + "\"" for k, v  in self.attributes.items()]
+        attr_str = ""
+        for attr in attrs:
+            attr_str += attr
+        return "<" + self.tag + ">"
 
 class Layout:
-    def __init__(self, tokens):
-        self.tokens = tokens
+    def __init__(self, tree):
         self.display_list = []
         self.line = []
         self.cursor_x = HSTEP
@@ -33,68 +47,67 @@ class Layout:
         self.pre_font = tkinter.font.Font(size=self.size, weight=self.weight, 
                                           slant=self.style, family="Courier")
 
-        for tok in tokens:
-            self.token(tok)
+        self.recurse(tree)
         self.flush()
 
-    def token(self, tok):
-        if isinstance(tok, Text):
-            self.text(tok)
-        elif tok.tag == "i":
+    def open_tag(self, tag):
+        if tag == "i":
             self.style = "italic"
-        elif tok.tag == "/i":
-            self.style = "roman"
-        elif tok.tag == "b":
+        elif tag == "b":
             self.weight = "bold"
-        elif tok.tag == "/b":
-            self.weight = "normal"
-        elif tok.tag == "small":
+        elif tag == "small":
             self.size -= 2
-        elif tok.tag == "/small":
-            self.size += 2
-        elif tok.tag == "big":
+        elif tag == "big":
             self.size += 4
-        elif tok.tag == "/big":
-            self.size -= 4     
-        elif tok.tag == "abbr":
+        elif tag == "abbr":
             self.size -= 4
             self.weight = "bold"
             self.abbr = True
-        elif tok.tag == "/abbr":
-            self.size += 4
-            self.weight = "normal"    
-            self.abbr = False   
-        elif tok.tag == "pre":
+        elif tag == "pre":
             self.pre = True
-        elif tok.tag == "/pre":
-            self.pre = False
-        elif tok.tag == "sub":
+        elif tag == "sub":
             self.size -= int(self.size/2)
-        elif tok.tag == "/sub":
-            self.size *= 2
-        elif tok.tag == "br":
+        elif tag == "br":
             self.flush()
-        elif tok.tag == "/p":
+
+    def close_tag(self, tag):
+        if tag == "i":
+            self.style = "roman"
+        elif tag == "b":
+            self.weight = "normal"
+        elif tag == "small":
+            self.size += 2
+        elif tag == "big":
+            self.size -= 4
+        elif tag == "abbr":
+            self.size += 4
+            self.weight = "normal"
+            self.abbr = False
+        elif tag == "pre":
+            self.pre = False
+        elif tag == "sub":
+            self.size *= 2
+        elif tag == "p":
             self.flush()
             self.cursor_y += VSTEP
 
-    def text(self, tok):
-        if self.pre:
-            for l in tok.text.splitlines():
-                self.line.append((self.cursor_x, l, self.pre_font))
-                self.flush()
+    def word(self, word):
+        font = get_font(self.size, self.weight, self.style)
+        w = font.measure(word)
+        if self.cursor_x + w > WIDTH:
+            self.flush()
+        self.line.append((self.cursor_x, word, font))
+        self.cursor_x += w + font.measure(" ")
 
+    def recurse(self, tree):
+        if isinstance(tree, Text):
+            for word in tree.text.split():
+                self.word(word)
         else:
-            font = get_font(self.size, self.weight, self.style)
-            for word in tok.text.split(): # assume space-seperated language
-                if self.abbr:
-                    word = word.upper()
-
-                w = font.measure(word)
-                if self.cursor_x + w > WIDTH - HSTEP:
-                    self.flush()
-                self.line.append((self.cursor_x, word, font))
-                self.cursor_x += w + font.measure(" ")
+            self.open_tag(tree.tag)
+            for child in tree.children:
+                self.recurse(child)
+            self.close_tag(tree.tag)
 
     def flush(self):
         if not self.line: return
@@ -117,7 +130,7 @@ class Browser:
     def __init__(self):
         self.scroll = 0
         self.display_list = []
-        self.tokens = None
+        self.nodes = None
     
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, highlightthickness=0)
@@ -133,10 +146,9 @@ class Browser:
     def load(self, url):
         scheme, headers, body = request(url)
         if scheme == "view-source:http":
-            self.tokens = lex(transform(body))
-        else:
-            self.tokens = lex(body)
-        self.display_list = Layout(self.tokens).display_list
+            body = transform(body)
+        self.nodes = HTMLParser(body).parse()
+        self.display_list = Layout(self.nodes).display_list
         self.draw()
 
     def draw(self):
@@ -174,7 +186,7 @@ class Browser:
         global WIDTH, HEIGHT
         WIDTH, HEIGHT = e.width, e.height
         self.canvas.config(width=WIDTH, height=HEIGHT)
-        self.display_list = Layout(self.tokens).display_list
+        self.display_list = Layout(self.nodes).display_list
         self.draw()
 
     def zoom(self, e):
@@ -183,8 +195,137 @@ class Browser:
         elif e.keysym == "minus" and ZOOM_RATIO >= 1: ZOOM_RATIO -= 1
         else: ZOOM_RATIO = 1
         HSTEP, VSTEP, SCROLL_STEP = HSTEP*ZOOM_RATIO, VSTEP*ZOOM_RATIO, SCROLL_STEP*ZOOM_RATIO
-        self.display_list = Layout(self.tokens).display_list
+        self.display_list = Layout(self.nodes).display_list
         self.draw()
+
+class HTMLParser:
+    SELF_CLOSING_TAGS = [ 
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
+    ]
+    HEAD_TAGS = [
+        "base", "basefont", "bgsound", "noscript",
+        "link", "meta", "title", "style", "script",
+    ]
+    
+    def __init__(self, body):
+        self.body = body
+        self.unfinished = []
+
+    def parse(self):
+        in_tag = False
+        text = ""
+        entity = ""
+        in_body = False
+
+        for c in self.body:
+            if c == "<": # enter tag
+                in_tag = True
+                if text and in_body: 
+                    self.add_text(text)
+                text = ""
+            elif c == ">": # exit tag
+                if "body" in text:
+                    in_body = True
+                elif "/body" in text:
+                    in_body == False
+                in_tag = False
+                self.add_tag(text)
+                text = ""
+            elif c == "&" or entity:
+                entity += c
+                if c == ";":
+                    if entity == "&lt;":
+                        entity = "<"
+                    elif entity == "&gt;":
+                        entity = ">"
+                    elif entity == "&shy;":
+                        entity = "-"
+                    text += entity
+                    entity = ""
+            else:
+                text += c
+                if entity:
+                    text += entity
+                    entity = ""
+
+        if not in_tag and text and in_body:
+            self.add_text(text)
+
+        return self.finish()
+    
+    def add_text(self, text):
+        if text.isspace(): return
+        self.implicit_tags(None)
+        parent = self.unfinished[-1]
+        node = Text(text, parent)
+        parent.children.append(node)
+
+    def add_tag(self, tag):
+        tag, attributes = self.get_attributes(tag)
+        if tag.startswith("!"): return
+        self.implicit_tags(tag)
+
+        if tag.startswith("/"):
+            if len(self.unfinished) == 1: return
+            node = self.unfinished.pop()
+            parent = self.unfinished[-1]
+            parent.children.append(node)
+        elif tag in self.SELF_CLOSING_TAGS:
+            parent = self.unfinished[-1]
+            node = Element(tag, attributes, parent)
+            parent.children.append(node)
+        else:
+            parent = self.unfinished[-1] if self.unfinished else None
+            node = Element(tag, attributes, parent)
+            self.unfinished.append(node)
+
+    def implicit_tags(self, tag):
+        while True:
+            open_tags = [node.tag for node in self.unfinished]
+            if open_tags == [] and tag != "html":
+                self.add_tag("html")
+            elif open_tags == ["html"] \
+              and tag not in ["head", "body", "/html"]:
+                if tag in self.HEAD_TAGS:
+                    self.add_tag("head")
+                else:
+                    self.add_tag("body")
+            elif open_tags == ["html", "head"] \
+              and tag not in ["/head"] + self.HEAD_TAGS:
+                self.add_tag("/head")
+            else: 
+                break
+
+    def finish(self):
+        if len(self.unfinished) == 0:
+                self.add_tag("html")
+
+        while len(self.unfinished) > 1:
+            node = self.unfinished.pop()
+            parent = self.unfinished[-1]
+            parent.children.append(node)
+
+        return self.unfinished.pop()
+    
+    def get_attributes(self, text):
+        parts = text.split()
+        try:
+            tag = parts[0].lower()
+        except:
+            tag = ''
+        attributes = {}
+
+        for attrpair in parts[1:]:
+            if "=" in attrpair:
+                key, value = attrpair.split("=", 1)
+                if len(value) > 2 and value[0] in ["'", "\""]:
+                    value = value[1:-1]
+                attributes[key.lower()] = value
+            else:
+                attributes[attrpair.lower()] = ""
+
+        return tag, attributes
 
 # textbook functions
 def get_font(size, weight, slant):
@@ -196,7 +337,7 @@ def get_font(size, weight, slant):
   
 def request(url):
     # url scheme parsing
-    scheme, url = parse(url)
+    scheme, url = schema(url)
 
     if scheme == "file": 
         with open(url[1:], 'r+', encoding="utf8") as file:
@@ -266,50 +407,13 @@ def request(url):
 
     return scheme, headers, body
 
-def lex(body):
-    in_tag = False
-    text = ""
-    entity = ""
-    out = []
-    in_body = False
-
-    for c in body:
-        if c == "<": # enter tag
-            in_tag = True
-            if text and in_body: out.append(Text(text))
-            text = ""
-        elif c == ">": # exit tag
-            if "body" in text:
-                in_body = True
-            elif "/body" in text:
-                in_body == False
-            in_tag = False
-            out.append(Tag(text))
-            text = ""
-        elif c == "&" or entity:
-            entity += c
-            if c == ";":
-                if entity == "&lt;":
-                    entity = "<"
-                elif entity == "&gt;":
-                    entity = ">"
-                elif entity == "&shy;":
-                    entity = "-"
-                text += entity
-                entity = ""
-        else:
-            text += c
-            if entity:
-                text += entity
-                entity = ""
-
-    if not in_tag and text and in_body:
-        out.append(Text(text))
-
-    return out
+def print_tree(node, indent=0):
+    print(" " * indent, node)
+    for child in node.children:
+        print_tree(child, indent + 2)
 
 # my own helper functions
-def parse(url): # get schema
+def schema(url): # get schema
     if url.startswith("data:text/html"):
         return "data:text/html", url[15:]
     
@@ -320,16 +424,15 @@ def parse(url): # get schema
     print("Unknown scheme {}".format(url.split("://",1)))
     sys.exit("Exiting...")
 
-def transform(token): # view source
-    text = token.text.replace("<","&lt;")
-    text = token.text.replace(">","&gt;")
+def transform(node): # view source
+    text = node.text.replace("<","&lt;")
+    text = node.text.replace(">","&gt;")
     return text
 
 if __name__ == "__main__":
     load_dotenv()
-    # Browser().load("https://www.gutenberg.org/cache/epub/1567/pg1567-images.html")
-    # Browser().load("https://browser.engineering/text.html")
-    Browser().load(os.getenv("DEFAULT_SITE"))
+    Browser().load("https://browser.engineering/html.html")
+    # Browser().load(os.getenv("DEFAULT_SITE"))
     tkinter.mainloop()
 
     # if no url provided open default file
